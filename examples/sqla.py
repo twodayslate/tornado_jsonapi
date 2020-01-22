@@ -4,14 +4,21 @@
 import tornado.ioloop
 from tornado.options import options, define
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 
 import tornado_jsonapi.handlers
 import tornado_jsonapi.resource
 
 Base = declarative_base()
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True)
+    text = Column(String)
 
 
 class Post(Base):
@@ -20,8 +27,10 @@ class Post(Base):
     id = Column(Integer, primary_key=True)
     author = Column(String)
     text = Column(String)
-    hideMe = Column(DateTime)
+    hideMe = Column(DateTime, nullable=True)
     hideMe2 = Column(String, default="secret")
+    _tagId = Column(Integer, ForeignKey("tags.id"))
+    tagged = relationship("Tag")
 
 
 def main():
@@ -41,6 +50,9 @@ def main():
         p = Post()
         p.author = "Author %d" % i
         p.text = "Text for %d" % i
+        t = Tag()
+        t.text = "python"
+        p.tagged = t
         s.add(p)
     s.commit()
 

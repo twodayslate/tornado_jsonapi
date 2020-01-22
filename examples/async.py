@@ -30,6 +30,9 @@ class Posts(tornado_jsonapi.resource.Resource):
         def attributes(self):
             return self.data
 
+        def relationships(self):
+            return None
+
     def __init__(self, data):
         self.data = data
         schema = json.loads(

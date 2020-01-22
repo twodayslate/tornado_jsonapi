@@ -22,7 +22,10 @@ class Resource:
         def attributes(self):
             raise NotImplementedError
 
-        # TODO : relationships, links, meta
+        def relationships(self):
+            raise NotImplementedError
+
+        # TODO : links, meta
 
     def __init__(self, schema, blacklist=None):
         self.schema = schema
@@ -95,6 +98,23 @@ class SQLAlchemyResource(Resource):
                 attributes_.pop(key, None)
             return attributes_
 
+        def relationships(self):
+            rels = []
+            for thing in self.model.__mapper__.relationships:
+                actualThing = getattr(self.model, thing.key)
+
+                r = SQLAlchemyResource(
+                    actualThing.__class__,
+                    self.resource.sessionmaker,
+                    blacklist=self.blacklist,
+                )
+                rels.append(
+                    SQLAlchemyResource.ResourceObject(
+                        r, actualThing, blacklist=self.blacklist
+                    )
+                )
+            return rels
+
     def __init__(self, model_cls, sessionmaker, blacklist=None):
         self._primary_columns = model_cls.__table__.primary_key.columns.keys()
         if len(self._primary_columns) > 1:
@@ -103,7 +123,7 @@ class SQLAlchemyResource(Resource):
         self.model_primary_key = getattr(self.model_cls, self._primary_columns[0])
         self.sessionmaker = sessionmaker
         self.session = sqlalchemy.orm.scoped_session(sessionmaker)
-        factory = alchemyjsonschema.SchemaFactory(alchemyjsonschema.StructuralWalker)
+        factory = alchemyjsonschema.SchemaFactory(alchemyjsonschema.NoForeignKeyWalker)
         schema = factory(self.model_cls, excludes=self._primary_columns)
         super().__init__(schema, blacklist=blacklist)
 
@@ -265,6 +285,9 @@ class DBAPI2Resource(Resource):
 
         def attributes(self):
             return {n: v for (n, v) in zip(self._resource.columns, self.row[:-1])}
+
+        def relationships(self):
+            return None
 
     def __init__(self, schema, dbapi, connection):
         self.cursor = dbapi2Cursor

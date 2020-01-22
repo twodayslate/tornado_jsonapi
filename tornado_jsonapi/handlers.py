@@ -163,13 +163,22 @@ class APIHandler(tornado.web.RequestHandler):
 
         for attr in blacklist_attr:
             attributes.pop(attr, None)
+
         attributes.validate()
 
-        return {
+        data = {
             "id": resource.id_(),
             "type": resource.type_(),
             "attributes": attributes._properties,
         }
+
+        if resource.relationships():
+            rels = []
+            for i in resource.relationships():
+                rels.append(self.render_resource(i))
+            data.update({"relationships": rels})
+
+        return data
 
     def render(self, resources, nullable=True, additional=None):
         data = self._get_meta()
