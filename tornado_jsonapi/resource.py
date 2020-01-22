@@ -175,9 +175,15 @@ class SQLAlchemyResource(Resource):
         if limit > 0:
             start = abs(page) * limit
             stop = start + limit
-            models = self.session.query(self.model_cls).slice(start, stop)
+            models = (
+                self.session.query(self.model_cls)
+                .order_by(self.model_primary_key.asc())
+                .slice(start, stop)
+            )
         else:
-            models = self.session.query(self.model_cls)
+            models = self.session.query(self.model_cls).order_by(
+                self.model_primary_key.asc()
+            )
         res = []
         for model in models:
             res.append(
