@@ -62,7 +62,7 @@ Installation
 
     $ pip install tornado_jsonapi
 
-For [SQLAlchemy](https://www.sqlalchemy.org/) support:
+For `SQLAlchemy <https://www.sqlalchemy.org/>`_ support:
 
 .. code-block:: bach
 
