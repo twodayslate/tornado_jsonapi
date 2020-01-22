@@ -103,16 +103,18 @@ class SQLAlchemyResource(Resource):
             for rel in self.model.__mapper__.relationships:
                 actualRel = getattr(self.model, rel.key)
 
-                resource = SQLAlchemyResource(
-                    actualRel.__class__,
-                    self.resource.sessionmaker,
-                    blacklist=self.blacklist,
-                )
-                rels.append(
-                    SQLAlchemyResource.ResourceObject(
-                        resource, actualRel, blacklist=self.blacklist
+                if actualRel:
+
+                    resource = SQLAlchemyResource(
+                        actualRel.__class__,
+                        self.resource.sessionmaker,
+                        blacklist=self.blacklist,
                     )
-                )
+                    rels.append(
+                        SQLAlchemyResource.ResourceObject(
+                            resource, actualRel, blacklist=self.blacklist
+                        )
+                    )
             return rels
 
     def __init__(self, model_cls, sessionmaker, blacklist=None):
