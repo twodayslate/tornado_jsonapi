@@ -20,8 +20,6 @@ class APISpecHandler(tornado.web.RequestHandler):
         self.resource = resource
 
     def get(self):
-        print(self.resource.schema)
-
         schema = copy.deepcopy(self.resource.schema)
 
         for i in self.resource.blacklist:

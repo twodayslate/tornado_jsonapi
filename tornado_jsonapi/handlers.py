@@ -181,7 +181,6 @@ class APIHandler(tornado.web.RequestHandler):
         else:
             json_resources = self.render_resource(resources, nullable)
 
-        print("data before additonal", data)
         if additional:
             for key in additional.keys():
                 # don't overwrite the meta
@@ -270,7 +269,6 @@ class APIHandler(tornado.web.RequestHandler):
                 self.request.protocol, self.request.host, self.request.uri
             )
             if len(self.request.arguments) > 0:
-                print(self.request.arguments)
                 if "page[number]" in self.request.arguments:
                     url = re.sub(r"page\[number\]=\d*", "", url)
                     url = re.sub(r"page%5Bnumber%5D=\d*", "", url)
