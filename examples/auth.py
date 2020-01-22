@@ -34,7 +34,7 @@ class AuthAPIHAndler(tornado_jsonapi.handlers.APIHandler):
                 return tornado_jsonapi.handlers.APIHandler.get(self, id_)
         except:
             pass
-        raise tornado_jsonapi.exceptions.APIError(status.HTTP_400_BAD_REQUEST, "Invalid API Key")
+        raise tornado_jsonapi.exceptions.APIError(status.HTTP_403_FORBIDDEN, "Invalid API Key")
 
 
 class Post(Base):
