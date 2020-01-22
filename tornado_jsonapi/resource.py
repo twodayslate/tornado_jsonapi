@@ -100,17 +100,17 @@ class SQLAlchemyResource(Resource):
 
         def relationships(self):
             rels = []
-            for thing in self.model.__mapper__.relationships:
-                actualThing = getattr(self.model, thing.key)
+            for rel in self.model.__mapper__.relationships:
+                actualRel = getattr(self.model, rel.key)
 
-                r = SQLAlchemyResource(
-                    actualThing.__class__,
+                resource = SQLAlchemyResource(
+                    actualRel.__class__,
                     self.resource.sessionmaker,
                     blacklist=self.blacklist,
                 )
                 rels.append(
                     SQLAlchemyResource.ResourceObject(
-                        r, actualThing, blacklist=self.blacklist
+                        resource, actualRel, blacklist=self.blacklist
                     )
                 )
             return rels

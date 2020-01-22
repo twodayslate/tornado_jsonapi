@@ -272,7 +272,9 @@ class APIHandler(tornado.web.RequestHandler):
             while is_future(count):
                 count = yield count
 
-            totalPages = int((count + limit - 1) / limit)
+            totalPages = 0
+            if limit != 0:
+                totalPages = int((count + limit - 1) / limit)
 
             url = "{}://{}{}".format(
                 self.request.protocol, self.request.host, self.request.uri
