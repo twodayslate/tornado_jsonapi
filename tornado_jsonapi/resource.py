@@ -24,7 +24,7 @@ class Resource:
 
         # TODO : relationships, links, meta
 
-    def __init__(self, schema):
+    def __init__(self, schema, blacklist=None):
         self.schema = schema
         builder = pjs.ObjectBuilder(self.schema)
         classes = builder.build_classes()
@@ -32,6 +32,9 @@ class Resource:
         if name not in classes:
             raise MissingResourceSchemaError(name)
         self._schema = classes[name]
+        self.blacklist = blacklist
+        if not self.blacklist:
+            self.blacklist = []
 
     def _on_request_end(self):
         pass
@@ -79,9 +82,7 @@ class SQLAlchemyResource(Resource):
                 self.blacklist = []
 
         def id_(self):
-            return str(
-                self.model.__getattribute__(self.resource._primary_columns[0])
-            )
+            return str(self.model.__getattribute__(self.resource._primary_columns[0]))
 
         def type_(self):
             return self.resource.name()
@@ -94,22 +95,17 @@ class SQLAlchemyResource(Resource):
                 attributes_.pop(key, None)
             return attributes_
 
-    def __init__(self, model_cls, sessionmaker):
+    def __init__(self, model_cls, sessionmaker, blacklist=None):
         self._primary_columns = model_cls.__table__.primary_key.columns.keys()
         if len(self._primary_columns) > 1:
             raise NotImplementedError("Compound primary keys not supported")
         self.model_cls = model_cls
-        self.model_primary_key = getattr(
-            self.model_cls, self._primary_columns[0]
-        )
+        self.model_primary_key = getattr(self.model_cls, self._primary_columns[0])
         self.sessionmaker = sessionmaker
         self.session = sqlalchemy.orm.scoped_session(sessionmaker)
-        self.blacklist = []
-        factory = alchemyjsonschema.SchemaFactory(
-            alchemyjsonschema.StructuralWalker
-        )
+        factory = alchemyjsonschema.SchemaFactory(alchemyjsonschema.StructuralWalker)
         schema = factory(self.model_cls, excludes=self._primary_columns)
-        super().__init__(schema)
+        super().__init__(schema, blacklist=blacklist)
 
     def _on_request_end(self):
         self.session.remove()
@@ -133,9 +129,7 @@ class SQLAlchemyResource(Resource):
         model = self.model_cls(**attributes)
         self.session.add(model)
         self.session.commit()
-        return SQLAlchemyResource.ResourceObject(
-            self, model, blacklist=self.blacklist
-        )
+        return SQLAlchemyResource.ResourceObject(self, model, blacklist=self.blacklist)
 
     def read(self, id_):
         model = (
@@ -153,17 +147,13 @@ class SQLAlchemyResource(Resource):
 
     def update(self, id_, attributes):
         model = (
-            self.session.query(self.model_cls)
-            .filter_by(**self._id_filter(id_))
-            .one()
+            self.session.query(self.model_cls).filter_by(**self._id_filter(id_)).one()
         )
         for k, v in attributes.items():
             setattr(model, k, v)
         self.session.merge(model)
         self.session.commit()
-        return SQLAlchemyResource.ResourceObject(
-            self, model, blacklist=self.blacklist
-        )
+        return SQLAlchemyResource.ResourceObject(self, model, blacklist=self.blacklist)
 
     def delete(self, id_):
         # TODO shouldnt it be
@@ -191,9 +181,7 @@ class SQLAlchemyResource(Resource):
         res = []
         for model in models:
             res.append(
-                SQLAlchemyResource.ResourceObject(
-                    self, model, blacklist=self.blacklist
-                )
+                SQLAlchemyResource.ResourceObject(self, model, blacklist=self.blacklist)
             )
         return res
 
@@ -270,9 +258,7 @@ class DBAPI2Resource(Resource):
             return self._resource.name()
 
         def attributes(self):
-            return {
-                n: v for (n, v) in zip(self._resource.columns, self.row[:-1])
-            }
+            return {n: v for (n, v) in zip(self._resource.columns, self.row[:-1])}
 
     def __init__(self, schema, dbapi, connection):
         self.cursor = dbapi2Cursor
@@ -424,10 +410,7 @@ class DBAPI2Resource(Resource):
                 )
             else:
                 cur = dbapiext.execute_f(
-                    cursor,
-                    "select %s from %s",
-                    self.columns + ["id"],
-                    self._tablename,
+                    cursor, "select %s from %s", self.columns + ["id"], self._tablename,
                 )
             if is_future(cur):
                 cur = yield cur
@@ -437,9 +420,7 @@ class DBAPI2Resource(Resource):
     @gen.coroutine
     def list_count(self):
         with (yield self.cursor(self.connection)) as cursor:
-            cur = dbapiext.execute_f(
-                cursor, "select count(1) from %s", self._tablename
-            )
+            cur = dbapiext.execute_f(cursor, "select count(1) from %s", self._tablename)
             if is_future(cur):
                 cur = yield cur
             rows = cur.fetchone()

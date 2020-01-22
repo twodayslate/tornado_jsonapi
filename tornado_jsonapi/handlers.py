@@ -6,6 +6,7 @@ import traceback
 import json
 import python_jsonschema_objects as pjs
 import status
+import re
 import accept
 import tornado
 import tornado.web
@@ -41,9 +42,7 @@ class APIHandler(tornado.web.RequestHandler):
         self.set_header("Content-Type", self._get_content_type())
         self.set_header(
             "Server",
-            "TornadoServer/{} tornado_jsonapi/{}".format(
-                tornado.version, __version__
-            ),
+            "TornadoServer/{} tornado_jsonapi/{}".format(tornado.version, __version__),
         )
 
     def write_error(self, status_code, **kwargs):
@@ -53,9 +52,7 @@ class APIHandler(tornado.web.RequestHandler):
         if isinstance(exception, tornado.web.HTTPError):
             reason = exception.reason
         if not reason:
-            reason = tornado.httputil.responses.get(
-                status_code, "Unknown error"
-            )
+            reason = tornado.httputil.responses.get(status_code, "Unknown error")
         detail = ""
         if isinstance(exception, tornado.web.HTTPError):
             detail = (
@@ -102,9 +99,7 @@ class APIHandler(tornado.web.RequestHandler):
         elif isinstance(value, tornado.web.HTTPError):
             if value.log_message:
                 format = "%d %s: " + value.log_message
-                args = [value.status_code, self._request_summary()] + list(
-                    value.args
-                )
+                args = [value.status_code, self._request_summary()] + list(value.args)
                 gen_log.warning(format, *args)
         else:
             value.error_id = APIError._generate_id()
@@ -177,18 +172,26 @@ class APIHandler(tornado.web.RequestHandler):
         }
 
     def render(self, resources, nullable=True, additional=None):
-        data = {}
+        data = self._get_meta()
         json_resources = []
         if isinstance(resources, collections.Sequence):
             for resource in resources:
                 json_resources.append(self.render_resource(resource))
-            data.update({"data_len": len(resources)})
+            data["meta"]["dataLength"] = len(resources)
         else:
             json_resources = self.render_resource(resources, nullable)
 
+        print("data before additonal", data)
         if additional:
-            data.update(additional)
-        data.update(dict(data=json_resources, **self._get_meta()))
+            for key in additional.keys():
+                # don't overwrite the meta
+                if key == "meta":
+                    for key in additional["meta"].keys():
+                        data["meta"][key] = additional["meta"][key]
+                else:
+                    data[key] = additional[key]
+
+        data.update(dict(data=json_resources))
 
         self.finish(json.dumps(data, ensure_ascii=False, indent=4))
 
@@ -215,9 +218,7 @@ class APIHandler(tornado.web.RequestHandler):
                 self._resource.name(),
             )
         if data["attributes"] is None:
-            raise APIError(
-                status.HTTP_400_BAD_REQUEST, "Missing object attributes"
-            )
+            raise APIError(status.HTTP_400_BAD_REQUEST, "Missing object attributes")
         attributes = data["attributes"].as_dict()
         if validate:
             try:
@@ -236,36 +237,73 @@ class APIHandler(tornado.web.RequestHandler):
         """
 
         limit = (
-            int(self.request.arguments["limit"][0])
-            if "limit" in self.request.arguments
+            int(self.request.arguments["page[size]"][0])
+            if "page[size]" in self.request.arguments
             else 0
         )
         server_limit = (
-            self.settings["jsonapi_limit"]
-            if "jsonapi_limit" in self.settings
-            else 0
+            self.settings["jsonapi_limit"] if "jsonapi_limit" in self.settings else 0
         )
         if server_limit > 0 and (limit > server_limit or limit == 0):
             limit = server_limit
 
         page = (
-            int(self.request.arguments["page"][0])
-            if "page" in self.request.arguments
-            else 0
+            int(self.request.arguments["page[number]"][0])
+            if "page[number]" in self.request.arguments
+            else 1
         )
+        page = abs(page)
+        if page <= 0:
+            page = 1  # so not zero indexed
 
         if not id_:
-            res = self._resource.list_(limit=limit, page=page)
+            res = self._resource.list_(limit=limit, page=page - 1)  # 0 index the page
             while is_future(res):
                 res = yield res
             count = self._resource.list_count()
             while is_future(count):
                 count = yield count
 
+            totalPages = int((count + limit - 1) / limit)
+
+            url = "{}://{}{}".format(
+                self.request.protocol, self.request.host, self.request.uri
+            )
+            if len(self.request.arguments) > 0:
+                print(self.request.arguments)
+                if "page[number]" in self.request.arguments:
+                    url = re.sub(r"page\[number\]=\d*", "", url)
+                    url = re.sub(r"page%5Bnumber%5D=\d*", "", url)
+                if "page[size]" in self.request.arguments:
+                    url = re.sub(r"page%5Bsize%5D=\d*", "", url)
+                    url = re.sub(r"page\[size\]=\d*", "", url)
+                link_url_base = url + "&page[number]={}&page[size]={}"
+            else:
+                if url[-1] != "/":
+                    url = url + "/"
+                link_url_base = url + "?page[number]={}&page[size]={}"
+
+            links = {"self": link_url_base.format(page, limit)}
+
+            if count > 0:
+                links.update(
+                    {
+                        "first": link_url_base.format(0, limit),
+                        "last": link_url_base.format(totalPages, limit),
+                    }
+                )
+
+                if page < totalPages:
+                    links.update({"next": link_url_base.format(page + 1, limit)})
+
+                if page > 1:
+                    links.update({"prev": link_url_base.format(page - 1, limit)})
+
             self.render(
                 res,
                 additional={
-                    "limits": {"total": count, "limit": limit, "page": page}
+                    "meta": {"totalItems": count, "totalPages": totalPages},
+                    "links": links,
                 },
             )
         else:

@@ -51,11 +51,7 @@ def main():
     cur = conn.cursor()
     for i in range(1, 16):
         cur.execute(
-            "INSERT INTO posts(text,author) VALUES(?,?)",
-            (
-                "Text" + str(i),
-                str(i)
-            )
+            "INSERT INTO posts(text,author) VALUES(?,?)", ("Text" + str(i), str(i))
         )
 
     application = tornado.web.Application(

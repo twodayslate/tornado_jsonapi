@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
 # vim: set fileencoding=utf8 :
 
-"""
-This example demonstrates adding rudementary API authentication
-
-More advanced authentication and security practices can be seen here:
-https://www.tornadoweb.org/en/stable/guide/security.html
-"""
-
 import tornado.ioloop
 from tornado.options import options, define
 
@@ -17,30 +10,27 @@ from sqlalchemy.orm import sessionmaker
 
 import tornado_jsonapi.handlers
 import tornado_jsonapi.resource
-import tornado_jsonapi.exceptions
-import status
+import copy
 
 Base = declarative_base()
 
 
-class AuthAPIHAndler(tornado_jsonapi.handlers.APIHandler):
-    """
-    A simple API handler that requires an API Key in order to GET
-    """
+class APISpecHandler(tornado.web.RequestHandler):
+    def initialize(self, resource) -> None:
+        self.resource = resource
 
-    @tornado.gen.coroutine
-    def get(self, id_=None):
-        try:
-            if (
-                "api" in self.request.arguments
-                and self.request.arguments["api"][0].decode() == "deadbeef"
-            ):
-                return tornado_jsonapi.handlers.APIHandler.get(self, id_)
-        except:
-            pass
-        raise tornado_jsonapi.exceptions.APIError(
-            status.HTTP_403_FORBIDDEN, "Invalid API Key"
-        )
+    def get(self):
+        print(self.resource.schema)
+
+        schema = copy.deepcopy(self.resource.schema)
+
+        for i in self.resource.blacklist:
+            if not isinstance(i, str):
+                schema["properties"].pop(str(i).split(".")[-1], None)
+            else:
+                schema["properties"].pop(i, None)
+
+        self.write(schema)
 
 
 class Post(Base):
@@ -78,7 +68,7 @@ def main():
     postResource.blacklist.append("hideMe2")
 
     application = tornado.web.Application(
-        [(r"/api/posts/([^/]*)", AuthAPIHAndler, dict(resource=postResource),),],
+        [(r"/posts/spec.json", APISpecHandler, dict(resource=postResource),),],
         **settings
     )
     application.listen(8888)
