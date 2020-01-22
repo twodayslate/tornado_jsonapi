@@ -62,6 +62,17 @@ Installation
 
     $ pip install tornado_jsonapi
 
+For [SQLAlchemy](https://www.sqlalchemy.org/) support:
+
+.. code-block:: bach
+
+    $ pip install tornado_jsonapi[sqlalchemy]
+
+For dbapi2 support:
+
+.. code-block:: bach
+
+    $ pip install tornado_jsonapi[dbapi2]
 
 Documentation
 -------------
