@@ -111,8 +111,11 @@ class SQLAlchemyResource(Resource):
                         blacklist=self.blacklist,
                     )
                     rels.append(
-                        SQLAlchemyResource.ResourceObject(
-                            resource, actualRel, blacklist=self.blacklist
+                        (
+                            rel.key,
+                            SQLAlchemyResource.ResourceObject(
+                                resource, actualRel, blacklist=self.blacklist
+                            ),
                         )
                     )
             return rels

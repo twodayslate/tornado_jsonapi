@@ -173,9 +173,9 @@ class APIHandler(tornado.web.RequestHandler):
         }
 
         if resource.relationships():
-            rels = []
-            for i in resource.relationships():
-                rels.append(self.render_resource(i))
+            rels = {}
+            for (key, res) in resource.relationships():
+                rels[key] = self.render_resource(res)
             data.update({"relationships": rels})
 
         return data
