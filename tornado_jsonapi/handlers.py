@@ -236,6 +236,17 @@ class APIHandler(tornado.web.RequestHandler):
                 raise APIError(status.HTTP_400_BAD_REQUEST, str(err)) from err
         return attributes
 
+    def _self_link(self, id_):
+        if self.request.method == "GET" or self.request.method == "PATCH":
+            url = "{}://{}{}".format(
+                self.request.protocol, self.request.host, self.request.path
+            )
+        else:
+            url = "{}://{}{}{}".format(
+                self.request.protocol, self.request.host, self.request.path, id_
+            )
+        return url
+
     @tornado.gen.coroutine
     def get(self, id_=None):
         """
@@ -319,7 +330,7 @@ class APIHandler(tornado.web.RequestHandler):
             res = self._resource.read(id_)
             while is_future(res):
                 res = yield res
-            self.render(res)
+            self.render(res, additional={"links": {"self": self._self_link(id_)}})
 
     @tornado.gen.coroutine
     def post(self, id_=None):
@@ -343,7 +354,9 @@ class APIHandler(tornado.web.RequestHandler):
             raise APIError()
         self.set_status(status.HTTP_201_CREATED)
         self.set_header("Location", self.request.uri + resource.id_())
-        self.render(resource)
+        self.render(
+            resource, additional={"links": {"self": self._self_link(resource.id_())}}
+        )
 
     @tornado.gen.coroutine
     def patch(self, id_):
@@ -368,7 +381,9 @@ class APIHandler(tornado.web.RequestHandler):
             resource = yield resource
         if not resource:
             raise APIError()
-        self.render(resource)
+        self.render(
+            resource, additional={"links": {"self": self._self_link(resource.id_())}}
+        )
 
     @tornado.gen.coroutine
     def delete(self, id_):
